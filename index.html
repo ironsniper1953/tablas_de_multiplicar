@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Juego de Tablas de Multiplicar</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .game-container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 100%;
+        }
+        .problem {
+            font-size: 2rem;
+            text-align: center;
+            margin: 1rem 0;
+            color: #333;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            font-size: 1.2rem;
+            margin: 1rem 0;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 1.2rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 1rem 0;
+            font-size: 1.2rem;
+        }
+        .message {
+            text-align: center;
+            margin: 1rem 0;
+            font-size: 1.2rem;
+            min-height: 1.2rem;
+        }
+        .correct { color: #4CAF50; }
+        .incorrect { color: #f44336; }
+        .progress {
+            text-align: center;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        .hidden { display: none; }
+        .timer {
+            text-align: center;
+            font-size: 1.5rem;
+            color: #333;
+            margin: 1rem 0;
+        }
+        .timer.warning {
+            color: #f44336;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .difficulty-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .difficulty-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .difficulty-btn.active {
+            transform: scale(1.05);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        #easyBtn {
+            background-color: #4CAF50;
+        }
+        #mediumBtn {
+            background-color: #FFA500;
+        }
+        #hardBtn {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 style="text-align: center; color: #333;">Practica las Tablas</h1>
+        
+        <div id="gameScreen">
+            <div class="difficulty-selector">
+                <button id="easyBtn" class="difficulty-btn" onclick="setDifficulty('easy')">Fácil</button>
+                <button id="mediumBtn" class="difficulty-btn" onclick="setDifficulty('medium')">Medio</button>
+                <button id="hardBtn" class="difficulty-btn" onclick="setDifficulty('hard')">Difícil</button>
+            </div>
+            <div class="timer" id="timer">60</div>
+            <div class="progress">
+                Pregunta <span id="currentQuestion">1</span>/20
+            </div>
+            <div class="stats">
+                <div>Aciertos: <span id="correct">0</span></div>
+                <div>Errores: <span id="incorrect">0</span></div>
+            </div>
+            <div class="problem" id="problem"></div>
+            <input type="number" id="answer" placeholder="Escribe tu respuesta">
+            <button onclick="checkAnswer()">Comprobar</button>
+            <div class="message" id="message"></div>
+        </div>
+
+        <div id="finalStats" class="hidden">
+            <h2>¡Ronda Completada!</h2>
+            <p>Resultados finales:</p>
+            <p>✅ Respuestas correctas: <span id="finalCorrect">0</span></p>
+            <p>❌ Respuestas incorrectas: <span id="finalIncorrect">0</span></p>
+            <p>📊 Porcentaje de aciertos: <span id="percentage">0</span>%</p>
+            <button onclick="startNewRound()">Jugar otra ronda</button>
+        </div>
+    </div>
+
+    <script>
+        let currentNum1, currentNum2;
+        let correctAnswers = 0;
+        let incorrectAnswers = 0;
+        let currentQuestion = 1;
+        let timer;
+        let timeLeft;
+        let currentDifficulty = 'easy';
+        const TOTAL_QUESTIONS = 20;
+        const TIME_PER_QUESTION = 60;
+
+        const difficultyRanges = {
+            easy: { min: 1, max: 5 },
+            medium: { min: 1, max: 10 },
+            hard: { min: 1, max: 12 }
+        };
+
+        function setDifficulty(difficulty) {
+            currentDifficulty = difficulty;
+            document.querySelectorAll('.difficulty-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`${difficulty}Btn`).classList.add('active');
+            startNewRound();
+        }
+
+        function updateTimer() {
+            const timerEl = document.getElementById('timer');
+            timerEl.textContent = timeLeft;
+            
+            if (timeLeft <= 10) {
+                timerEl.classList.add('warning');
+            } else {
+                timerEl.classList.remove('warning');
+            }
+
+            if (timeLeft <= 0) {
+                handleTimeUp();
+            } else {
+                timeLeft--;
+            }
+        }
+
+        function handleTimeUp() {
+            clearInterval(timer);
+            incorrectAnswers++;
+            updateStats();
+            document.getElementById('message').textContent = '¡Tiempo agotado!';
+            document.getElementById('message').className = 'message incorrect';
+            
+            if (currentQuestion < TOTAL_QUESTIONS) {
+                currentQuestion++;
+                setTimeout(generateProblem, 1500);
+            } else {
+                setTimeout(showFinalStats, 1500);
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('correct').textContent = correctAnswers;
+            document.getElementById('incorrect').textContent = incorrectAnswers;
+            document.getElementById('currentQuestion').textContent = currentQuestion;
+        }
+
+        function generateProblem() {
+            const range = difficultyRanges[currentDifficulty];
+            currentNum1 = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+            currentNum2 = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+            
+            document.getElementById('problem').textContent = `${currentNum1} × ${currentNum2} = ?`;
+            document.getElementById('answer').value = '';
+            document.getElementById('message').textContent = '';
+            document.getElementById('answer').focus();
+
+            // Reset timer
+            clearInterval(timer);
+            timeLeft = TIME_PER_QUESTION;
+            updateTimer();
+            timer = setInterval(updateTimer, 1000);
+        }
+
+        function showFinalStats() {
+            clearInterval(timer);
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('finalStats').classList.remove('hidden');
+            document.getElementById('finalCorrect').textContent = correctAnswers;
+            document.getElementById('finalIncorrect').textContent = incorrectAnswers;
+            const percentage = ((correctAnswers / TOTAL_QUESTIONS) * 100).toFixed(1);
+            document.getElementById('percentage').textContent = percentage;
+        }
+
+        function startNewRound() {
+            clearInterval(timer);
+            correctAnswers = 0;
+            incorrectAnswers = 0;
+            currentQuestion = 1;
+            document.getElementById('gameScreen').classList.remove('hidden');
+            document.getElementById('finalStats').classList.add('hidden');
+            updateStats();
+            generateProblem();
+        }
+
+        function checkAnswer() {
+            const userAnswer = parseInt(document.getElementById('answer').value);
+            const correctAnswer = currentNum1 * currentNum2;
+            const messageEl = document.getElementById('message');
+            
+            clearInterval(timer);
+            
+            if (userAnswer === correctAnswer) {
+                correctAnswers++;
+                messageEl.textContent = '¡Correcto! ¡Muy bien!';
+                messageEl.className = 'message correct';
+            } else {
+                incorrectAnswers++;
+                messageEl.textContent = `Incorrecto. La respuesta correcta es ${correctAnswer}`;
+                messageEl.className = 'message incorrect';
+            }
+            
+            updateStats();
+            
+            if (currentQuestion < TOTAL_QUESTIONS) {
+                currentQuestion++;
+                setTimeout(generateProblem, 1500);
+            } else {
+                setTimeout(showFinalStats, 1500);
+            }
+        }
+
+        // Permitir usar Enter para enviar la respuesta
+        document.getElementById('answer').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        // Establecer dificultad inicial y comenzar
+        setDifficulty('easy');
+    </script>
+</body>
+</html>
